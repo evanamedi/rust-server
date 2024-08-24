@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 toml = "0.5"
+r2d2 = "0.8"
+r2d2_sqlite = "0.20"

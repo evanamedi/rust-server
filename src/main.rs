@@ -1,9 +1,10 @@
 mod config;
-mod logging_middleware;
-mod middleware;
+mod db;
+mod middlewares;
 
-use logging_middleware::LoggingMiddleware;
-use middleware::Middleware;
+use middlewares::execute_middlewares;
+use middlewares::initialize_middlewares;
+use middlewares::Middleware;
 
 use std::fs;
 use std::io::{Read, Write};
@@ -14,7 +15,16 @@ use std::thread;
 
 fn main() {
     let config = load_configuration();
-    let middlewares = initialize_middlewares();
+
+    let pool = match db::init_db() {
+        Ok(pool) => pool,
+        Err(e) => {
+            eprintln!("Failed to initialize the database: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let middlewares = initialize_middlewares(pool.clone());
 
     if let Err(e) = init_server(&config, middlewares) {
         eprintln!("Server failed to start: {}", e);
@@ -30,10 +40,6 @@ fn load_configuration() -> config::Config {
             process::exit(1);
         }
     }
-}
-
-fn initialize_middlewares() -> Vec<Box<dyn Middleware>> {
-    vec![Box::new(LoggingMiddleware)]
 }
 
 fn init_server(
@@ -91,6 +97,7 @@ fn apply_middlewares_and_respond(
         middleware.handle(&mut buffer, response);
     }
 
+    execute_middlewares(middlewares, &mut buffer, response);
     respond_to_client(stream, status_line, response);
 }
 
